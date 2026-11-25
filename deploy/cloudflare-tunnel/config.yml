@@ -1,0 +1,14 @@
+# cloudflared named-tunnel config for DealDesk OS (recommended $0 hosting).
+# 1) cloudflared tunnel login        (opens a browser; Cory signs in to his Cloudflare account)
+# 2) cloudflared tunnel create dealdesk
+# 3) cloudflared tunnel route dns dealdesk desk.<your-domain>
+# 4) Put this file at ~/.cloudflared/config.yml, replace the placeholders, then:
+#    cloudflared tunnel run dealdesk      (or install as a service: sudo cloudflared service install)
+tunnel: <TUNNEL-UUID>
+credentials-file: /home/<user>/.cloudflared/<TUNNEL-UUID>.json
+ingress:
+  - hostname: desk.<your-domain>
+    service: http://127.0.0.1:4100
+    originRequest:
+      connectTimeout: 10s
+  - service: http_status:404

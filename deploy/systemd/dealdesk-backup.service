@@ -1,0 +1,7 @@
+[Unit]
+Description=DealDesk OS backup
+[Service]
+Type=oneshot
+User=dealdesk
+WorkingDirectory=/opt/dealdesk
+ExecStart=/opt/dealdesk/deploy/backup.sh

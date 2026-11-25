@@ -1,0 +1,4 @@
+Lead ID,Borrower / entity (initials ok),Source,Consent on file? (email/call/text),Loan type,Property city/state,Est. loan amount,Stage,Last contact,Next action,Next follow-up date,Days since contact,Overdue?,Target close,Docs outstanding,Notes (no SSN/DOB/account #s)
+L-001,J.S. / Example Holdings LLC,Referral - agent,"Email+call (written, 11/20)",DSCR rental,"West Palm Beach, FL",325000,3-Scenario review,2026-11-20,Send scenario summary + doc list,2026-11-27,,,2026-12-30,"Lease, insurance quote",Sample row — fictional
+L-002,A.R.,Website/tool,Email only (checklist download),Fix & flip,"Jupiter, FL",240000,2-Contacted,2026-11-18,Follow-up email #2,2026-11-25,,,,"SOW, contractor bid",Sample row — fictional
+L-003,M.K. / Sample Rehab Co,Past client,Email+call+text (written),Bridge,"Lake Worth, FL",410000,6-Processing,2026-11-24,Order appraisal status check,2026-11-26,,,2026-12-15,Entity docs,Sample row — fictional

@@ -1,0 +1,17 @@
+# App + Cloudflare Tunnel, no published ports. Put secrets in .env (chmod 600) and the tunnel token in
+# CLOUDFLARE_TUNNEL_TOKEN (from Zero Trust > Networks > Tunnels > Create > Docker).
+services:
+  app:
+    build: .
+    env_file: .env
+    environment: { HOST: 0.0.0.0, COOKIE_SECURE: "1", TRUST_PROXY: "1" }
+    volumes: [ "dealdesk-data:/app/data" ]
+    restart: unless-stopped
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment: { TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN}" }   # public hostname -> http://app:4100
+    depends_on: [ app ]
+    restart: unless-stopped
+volumes:
+  dealdesk-data: {}

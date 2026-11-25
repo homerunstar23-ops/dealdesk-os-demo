@@ -1,0 +1,7 @@
+# State licensing variance
+
+> **⚠️ Responsibility & approval notice.** Cory remains responsible for his licensing, sponsorship (sponsoring-broker approval of all marketing and outside business activities), RESPA, TCPA, CAN-SPAM, fair lending (ECOA/FHA/UDAAP) and state rules. **Get sponsoring-broker compliance sign-off before any public or borrower-facing use.** This is educational/support material only — not legal advice, not a credit decision, and not a replacement for underwriters, compliance staff or company systems. Keep borrower data (NPI) only in company-approved systems. Fill every `{{PLACEHOLDER}}` before use.
+
+- Licensing for MLOs and companies is state-based through NMLS; requirements differ by state for: which loan types need a license (consumer vs. business-purpose, 1–4 unit vs. commercial), advertising disclosures, record-keeping, continuing education, branch/remote-work rules and telemarketing.
+- Reference: NMLS State Licensing Requirements — https://mortgage.nationwidelicensingsystem.org/slr/Pages/default.aspx · Conference of State Bank Supervisors — https://www.csbs.org/
+- **Before marketing nationally** (a website is national by default): compliance should confirm (1) states where Cory/his sponsor are licensed, (2) states where the specific investor loan products require licensing, (3) per-state ad disclosure language, (4) whether the site needs "available only in licensed states" language or geo-limited lead capture.

@@ -1,0 +1,23 @@
+# /etc/systemd/system/dealdesk.service — run DealDesk OS on a Linux VM (e.g. Oracle Cloud Always Free)
+[Unit]
+Description=DealDesk OS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dealdesk
+WorkingDirectory=/opt/dealdesk
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+# hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/dealdesk/data /opt/dealdesk/logs /opt/dealdesk/backups
+PrivateTmp=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

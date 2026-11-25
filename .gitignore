@@ -1,0 +1,12 @@
+node_modules/
+.env
+secrets/
+data/
+logs/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+backups/
+screenshots-review/
+*.png

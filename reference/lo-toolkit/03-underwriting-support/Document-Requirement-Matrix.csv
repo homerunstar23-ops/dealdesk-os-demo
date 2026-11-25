@@ -1,0 +1,25 @@
+Category,Document,DSCR rental,Fix & flip,Bridge,Ground-up,Cash-out refi
+Borrower,Loan application (company form),R,R,R,R,R
+Borrower,Government photo ID,R,R,R,R,R
+Borrower,Credit authorization,R,R,R,R,R
+Borrower,Real estate experience / track record schedule,C,R,R,R,C
+Borrower,"Bank/asset statements (down payment, closing, reserves)",R,R,R,R,R
+Borrower,Source of large deposits explanation,C,C,C,C,C
+Entity,Articles of organization / formation,C,C,C,C,C
+Entity,Operating agreement,C,C,C,C,C
+Entity,EIN letter,C,C,C,C,C
+Entity,Certificate of good standing,C,C,C,C,C
+Property,Purchase contract + addenda,P,R,P,P,—
+Property,Hazard insurance quote/binder,R,R,R,R,R
+Property,Flood certificate / flood insurance if in SFHA,R,R,R,R,R
+Property,Appraisal / valuation (lender-ordered),R,R,R,R,R
+Property,Lease(s) / rent roll,R,—,C,—,R
+Property,Market rent analysis (appraisal rent schedule),R,—,C,C,R
+Property,Scope of work + rehab budget,—,R,C,—,C
+Property,"Contractor bid, license, insurance",—,R,C,R,C
+Property,"Plans, permits, construction budget & schedule",—,C,—,R,—
+Property,Title commitment (via title company),R,R,R,R,R
+Property,Current mortgage statement / payoff,P,—,P,P,R
+Property,Property tax bill,R,R,R,R,R
+Property,HOA questionnaire/dues (if any),C,C,C,—,C
+Property,Exit strategy write-up,C,R,R,R,C

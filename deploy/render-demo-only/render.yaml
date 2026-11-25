@@ -1,0 +1,35 @@
+# DEMO-ONLY Render Blueprint (free plan). NOT for real borrower data:
+# free web services spin down after 15 idle minutes and have an ephemeral filesystem, so the SQLite DB
+# and uploads are wiped on every spin-down/restart/redeploy. Demo data re-seeds on each start.
+# Do not apply without Cory's approval. Nothing has been created on Render.
+services:
+  - type: web
+    name: dealdesk-os-demo
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: SEED_DEMO
+        value: "1"
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DEMO_MODE
+        value: "1"
+      - key: OUTBOUND_DRY_RUN
+        value: "1"
+      - key: PUBLIC_BASE_URL
+        sync: false
