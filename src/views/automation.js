@@ -1,6 +1,6 @@
 'use strict';
 // Shared view pieces for the automation features (deal portal panel, outbox tables).
-const { html, raw, fmtDateTime } = require('../lib/util');
+const { html, raw, fmtDateTime, fmtDate } = require('../lib/util');
 const { csrfInput } = require('./layout');
 const stages = require('../lib/stages');
 
@@ -13,8 +13,8 @@ function portalPanel(db, engine, d, csrf) {
   const url = l ? engine.portalUrl(d.id, { create: false }) : null;
   const ups = db.prepare('SELECT body, source, created_at FROM portal_updates WHERE deal_id = ? ORDER BY created_at DESC, id DESC LIMIT 5').all(d.id);
   const vis = db.prepare("SELECT COUNT(*) n FROM conditions WHERE deal_id = ? AND borrower_visible = 1 AND status = 'requested'").get(d.id).n;
-  return html`<section class="card portal-panel"><div class="card-head"><h2>Borrower status portal</h2>${l ? html`<a class="btn small ghost" href="${url}" target="_blank" rel="noopener">Preview ↗</a>` : ''}</div>
-<p class="small muted">Borrower sees: stage timeline (now: <strong>${stages.label(d.stage)}</strong>), plain-English next steps, ${vis} requested item(s) with upload buttons, updates you post below, and your contact card. Never shown: internal notes, red flags, underwriting notes, items marked internal.</p>
+  return html`<section class="card portal-panel" id="portal"><div class="card-head"><h2>Borrower status portal</h2>${l ? html`<a class="btn small ghost" href="${url}" target="_blank" rel="noopener">Preview ↗</a>` : ''}</div>
+<p class="small muted">Investor sees: step timeline (now: <strong>${stages.label(d.stage)}</strong>), plain-English next steps, your expected next-step date (${d.next_step_date ? fmtDate(d.next_step_date) : html`<a href="#next-step">not set</a>`}), ${vis} requested item(s) with upload buttons, updates you post below, and your contact card. Never shown: internal notes, red flags, underwriting notes, items marked internal.</p>
 ${l ? html`<div class="copy-row"><input readonly value="${url}" id="portal-url-${d.id}" aria-label="Portal link"><button class="btn small" type="button" data-copy="#portal-url-${d.id}">Copy link</button></div>
 <p class="small">Verification: <strong>${l.verify_mode === 'email_phone4' ? 'email + last 4 of phone' : l.verify_mode === 'email' ? 'email on file' : 'none (link only)'}</strong> · viewed ${l.view_count}× ${l.last_viewed_at ? html`(last ${fmtDateTime(l.last_viewed_at)})` : ''}${l.failed_count ? html` · <span class="err-text">${l.failed_count} failed attempt(s)</span>` : ''}</p>
 <form method="post" action="/deals/${d.id}/portal/revoke" class="inline" data-confirm="Turn off this link? The borrower will need a new one.">${csrfInput(csrf)}<button class="btn small ghost">Revoke link</button></form>` : html`<p>No active link.</p>`}

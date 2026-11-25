@@ -3,6 +3,7 @@ const { validTz } = require('../lib/timeutil');
 // CRM: contacts, companies, tasks, notes.
 const { html, money, fmtDate, fmtDateTime, str, text, int, oneOf, bool, date, email, phone, todayISO, backTo } = require('../lib/util');
 const { field, csrfInput, stageClass, demoTag, badge } = require('../views/layout');
+const P = require('../lib/plain');
 const { CONTACT_TYPES } = require('../db');
 const model = require('../lib/model');
 
@@ -95,14 +96,14 @@ ${rows.map(c => html`<tr><td><a href="/contacts/${c.id}">${fullName(c)}</a>${dem
     const notes = db.prepare("SELECT n.*, u.name user_name FROM notes n LEFT JOIN users u ON u.id = n.user_id WHERE entity_type = 'contact' AND entity_id = ? ORDER BY n.id DESC").all(c.id);
     const acts = db.prepare("SELECT a.*, u.name user_name FROM activities a LEFT JOIN users u ON u.id = a.user_id WHERE entity_type = 'contact' AND entity_id = ? ORDER BY a.id DESC LIMIT 30").all(c.id);
     if (req.query.edit) return res.page('Edit ' + fullName(c), '/contacts', html`<h1>Edit ${fullName(c)}</h1>${contactForm(res.locals.csrf, c, companies())}`);
-    res.page(fullName(c), '/contacts', html`<div class="page-head"><h1>${fullName(c)}${demoTag(c)} <small class="muted">${c.type}</small></h1><div><a class="btn ghost" href="/contacts/${c.id}?edit=1">Edit</a> <a class="btn" href="/deals/new?contact_id=${c.id}">+ New deal</a> ${c.dnc ? '' : html`<a class="btn ghost" href="/templates?contact_id=${c.id}">Templates</a>`}</div></div>
+    res.page(fullName(c), '/contacts', html`<div class="page-head"><h1>${fullName(c)}${demoTag(c)} <small class="muted">${c.type}</small></h1><div><a class="btn ghost" href="/contacts/${c.id}?edit=1">Edit</a> <a class="btn primary" href="/new?contact_id=${c.id}">+ New deal</a> ${c.dnc ? '' : html`<a class="btn ghost" href="/templates?contact_id=${c.id}">Templates</a>`}</div></div>
 ${c.dnc ? html`<div class="flash err"><strong>Do not contact.</strong> Opted out ${fmtDate(c.opted_out_at)}. Do not call, text or email for marketing.</div>` : ''}
 <div class="grid2"><section class="card"><h2>Profile</h2><dl class="dl">
 <dt>Email</dt><dd>${c.email || '—'}</dd><dt>Phone</dt><dd>${c.phone || '—'}</dd><dt>Company</dt><dd>${c.company_id ? html`<a href="/companies/${c.company_id}">${c.company}</a>` : '—'}</dd>
 <dt>Location</dt><dd>${[c.city, c.state].filter(Boolean).join(', ') || '—'}</dd><dt>Lead source</dt><dd>${c.lead_source || '—'}</dd><dt>Tags</dt><dd>${c.tags || '—'}</dd>
 <dt>Consent</dt><dd>${consentBadges(c)}<br><span class="small muted">Email: ${fmtDate(c.email_consent_at)} · SMS: ${fmtDate(c.sms_consent_at)} · Method: ${c.consent_method || '—'}</span></dd>
 <dt>Notes</dt><dd>${c.notes || '—'}</dd></dl></section>
-<section class="card"><h2>Deals</h2>${deals.length ? html`<ul class="list">${deals.map(d => html`<li><a href="/deals/${d.id}">${d.name}</a> <span class="${stageClass(d.stage)}">${d.stage}</span> ${money(d.loan_amount)}</li>`)}</ul>` : html`<p class="muted">No deals yet.</p>`}</section>
+<section class="card"><h2>Deals</h2>${deals.length ? html`<ul class="list">${deals.map(d => html`<li><a href="/deals/${d.id}">${d.name}</a> ${P.stageChip(d.stage)} ${money(d.loan_amount)}</li>`)}</ul>` : html`<p class="muted">No deals yet.</p>`}</section>
 ${automationCard(c, res.locals.csrf, deals)}
 ${tasksBlock(res.locals.csrf, tasks, { contactId: c.id })}${notesBlock(res.locals.csrf, 'contact', c.id, notes)}${activityBlock(acts)}</div>`);
   });
@@ -166,7 +167,7 @@ ${field('notes', 'Notes (no EINs or account numbers)', { type: 'textarea', value
     const notes = db.prepare("SELECT n.*, u.name user_name FROM notes n LEFT JOIN users u ON u.id = n.user_id WHERE entity_type = 'company' AND entity_id = ? ORDER BY n.id DESC").all(c.id);
     res.page(c.name, '/companies', html`<div class="page-head"><h1>${c.name}${demoTag(c)} <small class="muted">${c.kind || ''}</small></h1><a class="btn ghost" href="/companies/${c.id}?edit=1">Edit</a></div>
 <div class="grid2"><section class="card"><h2>People</h2><ul class="list">${contacts.map(p => html`<li><a href="/contacts/${p.id}">${fullName(p)}</a> <span class="muted">${p.type}</span></li>`)}</ul>${contacts.length ? '' : html`<p class="muted">None linked.</p>`}</section>
-<section class="card"><h2>Deals (vesting)</h2><ul class="list">${deals.map(d => html`<li><a href="/deals/${d.id}">${d.name}</a> <span class="${stageClass(d.stage)}">${d.stage}</span></li>`)}</ul>${deals.length ? '' : html`<p class="muted">None.</p>`}</section>
+<section class="card"><h2>Deals (vesting)</h2><ul class="list">${deals.map(d => html`<li><a href="/deals/${d.id}">${d.name}</a> ${P.stageChip(d.stage)}</li>`)}</ul>${deals.length ? '' : html`<p class="muted">None.</p>`}</section>
 <section class="card"><h2>Details</h2><dl class="dl"><dt>State</dt><dd>${c.state || '—'}</dd><dt>Website</dt><dd>${c.website || '—'}</dd><dt>Notes</dt><dd>${c.notes || '—'}</dd></dl></section>
 ${notesBlock(res.locals.csrf, 'company', c.id, notes)}</div>`);
   });

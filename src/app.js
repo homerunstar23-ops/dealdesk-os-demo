@@ -65,7 +65,8 @@ function createApp(opts = {}) {
   app.use((req, res, next) => {
     res.page = (title, active, body, extra = {}) => {
       const flash = req.session.flash; if (flash) delete req.session.flash;
-      res.send(page({ title, active, body, user: req.user, csrf: res.locals.csrf, settings: model.getSettings(db), flash, demoMode: config.demoMode, ...extra }));
+      const navCounts = req.user ? { held: db.prepare("SELECT COUNT(*) n FROM outbox WHERE status = 'held'").get().n } : {};
+      res.send(page({ title, active, body, user: req.user, csrf: res.locals.csrf, settings: model.getSettings(db), flash, demoMode: config.demoMode, navCounts, ...extra }));
     };
     req.flash = (msg, type = 'ok') => { req.session.flash = { msg, type }; };
     next();
@@ -77,14 +78,17 @@ function createApp(opts = {}) {
   require('./routes/public')(app);       // /apply, /u/:token, stripe webhook (no login)
   require('./routes/portal')(app);       // /p/:token borrower status portal, /unsub/:token, /webhooks/sms (no login)
   app.use(requireAuth);                   // everything below requires login
-  require('./routes/dashboard')(app);
+  require('./routes/today')(app);         // v3: / (Today queue), /search, /more
+  require('./routes/wizard')(app);        // v3: /new guided New-deal wizard
+  require('./routes/insights')(app);      // v3: /pipeline/health, /deals/:id/next, /deals/:id/summary
+  require('./routes/dashboard')(app);     // classic numbers board, now at /dashboard
   require('./routes/crm')(app);
   require('./routes/deals')(app);
   require('./routes/library')(app);       // templates + compliance
   require('./routes/settings')(app);
   require('./routes/automation')(app);    // /outbox, /automations
 
-  app.use((req, res) => res.status(404).page('Not found', '', '<h1>Not found</h1><p><a href="/">Back to dashboard</a></p>'));
+  app.use((req, res) => res.status(404).page('Not found', '', '<div class="empty"><div class="empty-art">🧭</div><h1>We couldn\'t find that page</h1><p><a class="btn big" href="/">Back to Today</a></p></div>'));
   app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
     console.error(err);
     const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : 500);

@@ -142,7 +142,10 @@ function seedDemoV2(db, engine, now = new Date()) {
   // borrower wording + internal-only items on the demo portal deal
   db.prepare("UPDATE conditions SET borrower_visible = 0 WHERE deal_id = ? AND title LIKE 'Wire instructions verified%'").run(d6.id);
   db.prepare("UPDATE conditions SET borrower_text = 'Insurance binder from your agent showing the lender as mortgagee and the coverage amount', note = 'DEMO internal: agent slow to respond; coverage short by $20k on first draft' WHERE deal_id = ? AND title LIKE 'Insurance binder%'").run(d6.id);
-  engine.createPortalLink(d6.id, { verifyMode: 'email_phone4' });
+  engine.createPortalLink(d6.id, { verifyMode: 'email_phone4', token: engine.demoToken ? engine.demoToken('avery-3-sampleton') : null });
+  // v3: LO-entered expected next-step date shown on the investor's status page (demo)
+  const eta = new Date(now.getTime() + 4 * 864e5).toISOString().slice(0, 10);
+  db.prepare('UPDATE deals SET next_step_date = ?, next_step_note = ? WHERE id = ?').run(eta, 'We expect to review your uploaded items with the lender', d6.id);
   const upd = db.prepare("INSERT INTO portal_updates (deal_id, body, source, rule_key, created_at) VALUES (?,?,?,?,?)");
   upd.run(d6.id, 'We received your scenario. A licensed loan officer will review it and follow up.', 'automation', 'intake_ack', ago(30));
   upd.run(d6.id, 'Your file moved to "Application". Thanks for the documents so far.', 'automation', 'stage_change', ago(21));

@@ -1,3 +1,128 @@
+# Test run 2026-11-25 11:12 ET (v3)
+
+## npm test — 73/73 pass (52 v1/v2 + 21 new v3 in tests/v3.test.js)
+```
+▶ auth & security
+  ✔ health + unauthenticated redirect
+  ✔ security headers
+  ✔ wrong password rejected, right password accepted, password stored as bcrypt
+  ✔ CSRF token required on POST
+  ✔ login is rate-limited
+  ✔ open redirect blocked after login
+  ✔ logout ends session
+✔ auth & security
+▶ modules
+  ✔ dashboard: pipeline by stage, tasks, intakes, conditions, unpaid (demo data, labeled DEMO)
+  ✔ CRM: contact with consent + DNC, edit logs consent changes, SSN-like text redacted
+  ✔ companies CRUD
+  ✔ tasks: overdue flag + toggle
+  ✔ pipeline: kanban + table, create deal seeds checklist, stage move logged
+  ✔ public intake: no login, validation, creates lead + deal + checklist + task, redacts SSN, no SSN/DOB fields
+  ✔ analyzer: saved inputs produce the tested calc results; estimate labeled not a commitment
+  ✔ underwriting: status flow timestamps, add condition, red flags, scenario export strips NPI
+  ✔ documents: expiring token link, public upload, type/magic/size limits, storage outside web root, auth download, revoke
+  ✔ payments: manual link, https only, status transitions, dashboard unpaid count
+  ✔ templates: merge fields from deal, DNC + SMS consent warnings, copy-only
+  ✔ compliance reference + responsibility note + footer disclaimer
+  ✔ settings: profile flows into merge fields + public footer; demo data can be deleted
+  ✔ XSS: user input is escaped everywhere
+✔ modules
+▶ stripe (mocked, test mode only)
+  ✔ key mode detection refuses live keys
+  ✔ creates a test payment link via mocked API; webhook marks paid
+  ✔ live key never calls Stripe
+✔ stripe (mocked, test mode only)
+▶ reference data
+  ✔ checklists per loan type follow the matrix
+  ✔ red flags and common conditions load
+✔ reference data
+✔ ported calc.js + memo.js pass the DealSheet Lab hand-worked cases
+▶ time + quiet hours
+  ✔ nextAllowed pushes late-night sends to 8am recipient-local, keeps daytime
+  ✔ transports simulate without credentials (no real sends)
+✔ time + quiet hours
+▶ demo v2 seed + outbox defaults
+  ✔ automated sending defaults OFF; demo messages are held or blocked, never sent
+  ✔ DNC contact: sequence message blocked and enrollment stopped
+  ✔ no SMS consent: stage-change text blocked
+  ✔ approving a held message with an incomplete profile keeps it held (needs physical address/NMLS)
+  ✔ approve with complete profile: simulated send with footer + unsubscribe link
+  ✔ quiet hours: approved at 11pm ET is rescheduled to 8am, not sent
+✔ demo v2 seed + outbox defaults
+▶ portal
+  ✔ unknown/invalid token 404s; valid token asks for verification and shows nothing private
+  ✔ wrong details rejected and counted; right details unlock the portal
+  ✔ upload without verification is refused; bad file type refused
+  ✔ locks after 10 failed attempts
+  ✔ revoked link stops working; mobile viewport meta present
+  ✔ staff can create a link, post an update, toggle borrower visibility
+✔ portal
+▶ automation rules
+  ✔ new intake: instant acknowledgement email+text with portal link, tasks, nurture enrollment, alert
+  ✔ intake without email consent: transactional ack allowed (lawful basis), no nurture, no text
+  ✔ stage change: tasks, checklist, portal update, status email; sequence stops when the lead advances
+  ✔ disabled rule does nothing
+  ✔ document reminders on day 2/5/9, deduped, canceled once items arrive
+  ✔ sequences: steps queue on schedule; reply, unsubscribe and SMS STOP stop them
+  ✔ kill switch ON: consented messages send (simulated) on tick; OFF moves queued back to held
+  ✔ stale-deal alerts and daily digest (in-app + queued internal email, once per day)
+✔ automation rules
+▶ admin pages
+  ✔ outbox + automations pages render, filters work, rule edits persist, message edit/approve/cancel
+  ✔ delete demo removes demo outbox rows and enrollments
+✔ admin pages
+▶ demo mode & publicBaseUrl
+  ✔ demoMode renders demo banner on login, dashboard, /apply and portal; publicBaseUrl sets portal links
+✔ demo mode & publicBaseUrl
+▶ v3 Today home screen
+  ✔ / is Today: one big next-best-action card with Do it / Done / Skip, ranked list below
+  ✔ ranking: new intake > overdue task > docs to review > outbox approvals
+  ✔ Done on an intake marks it reviewed and the next card moves up; Skip hides for today only
+  ✔ Done on a task completes the task; bad keys are ignored safely
+  ✔ empty state when nothing is left
+✔ v3 Today home screen
+▶ v3 New-deal wizard
+  ✔ one question per screen with a progress bar; guarded order
+  ✔ validation: friendly errors, nothing created
+  ✔ full flow creates contact (consent off by default), deal, checklist, follow-up task and status page
+  ✔ cash-out skips the buying/refinancing question and asks rent + payoff
+✔ v3 New-deal wizard
+▶ v3 Move to next step (gates) + expected next-step date
+  ✔ blocked with a plain-English checklist until the info is in
+  ✔ lender-only steps need an explicit confirm; approval language is blocked in investor notes
+  ✔ LO sets the expected next-step date; lint blocks rates and guarantees
+  ✔ classic stage dropdown still works and still runs automations
+✔ v3 Move to next step (gates) + expected next-step date
+▶ v3 investor portal redesign
+  ✔ stage timeline + progress, what we need, what happens next with the LO date; no approval words or internal notes
+  ✔ a past expected date is hidden from the investor
+  ✔ demo mode: the demo status-page link is stable across restarts (same secret), real links stay random
+✔ v3 investor portal redesign
+▶ v3 search, health, summary, plain-English UI
+  ✔ search + command bar (JSON and page); login required
+  ✔ pipeline health: SVG charts from app data only, no NaN, not approvals
+  ✔ term-sheet-style summary prints cleanly and never reads as an offer
+  ✔ plain-English labels replace jargon in staff screens; formal terms kept in tooltips
+  ✔ kill switch + dry run unchanged; CSP still forbids inline script
+✔ v3 search, health, summary, plain-English UI
+ℹ tests 73
+ℹ suites 15
+ℹ pass 73
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16570.42831
+```
+
+## npm run smoke — SMOKE OK
+Headless Chrome walked all 33 v1/v2 screens plus the v3 Today, pipeline health, search, More, move-to-next-step, deal summary, the full New-deal wizard (creates a deal on the throwaway instance) and the live command bar, with no console, CSP or page errors.
+
+## v3 screenshots (local pm2 instance, 127.0.0.1:4100) — node scripts/screenshots-v3.js
+screenshots-review/v3-*.png (desktop 1440x900 and mobile 390x844) + v3-summary-print.pdf. Not committed (gitignored).
+
+---
+
 # Test run 2026-11-25 10:08 EST (v2)
 
 ## npm test — 51/51 pass (v1: 27 incl. 48 calculator checks; v2: 24 new in tests/v2.test.js)

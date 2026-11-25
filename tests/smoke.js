@@ -34,7 +34,7 @@ const EMAIL = 'smoke@dealdesk.local', PASSWORD = 'smoke-test-password-' + Date.n
     await go('/login', 'Log in'); await shot('00-login', false);
     await page.type('input[name=email]', EMAIL); await page.type('input[name=password]', PASSWORD);
     await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('form[action="/login"] button')]);
-    await go('/', 'Open pipeline'); await shot('01-dashboard');
+    await go('/dashboard', 'Open pipeline'); await shot('01-dashboard');
     await go('/pipeline', 'Kanban'); await shot('02-pipeline-kanban');
     await go('/pipeline?view=table', 'Target close'); await shot('03-pipeline-table');
     await go('/contacts', 'Contacts'); await shot('04-contacts');
@@ -77,7 +77,7 @@ const EMAIL = 'smoke@dealdesk.local', PASSWORD = 'smoke-test-password-' + Date.n
     await Promise.all([pp.waitForNavigation({ waitUntil: 'networkidle0' }), pp.click('form button.big')]);
     if (!(await pp.content()).includes('your scenario was received')) throw new Error('intake submit failed');
     await pp.screenshot({ path: path.join(OUT, '22-public-intake-thanks.png') }); results.push('22-public-intake-thanks');
-    await go('/', 'Smoke Tester'); await shot('23-dashboard-after-intake');
+    await go('/dashboard', 'Smoke Tester'); await shot('23-dashboard-after-intake');
     // Kanban one-click move
     await go('/pipeline'); const before = db.prepare('SELECT stage FROM deals WHERE id = ?').get(d4).stage;
     await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.select(`form[action="/deals/${d4}/stage"].kmove select`, 'Underwriting')]);
@@ -106,7 +106,20 @@ const EMAIL = 'smoke@dealdesk.local', PASSWORD = 'smoke-test-password-' + Date.n
     if (!(await pv.content()).includes('Uploaded: Insurance-Binder.pdf')) throw new Error('portal upload failed');
     await pv.screenshot({ path: path.join(OUT, '31-portal-mobile-after-upload.png'), fullPage: false }); results.push('31-portal-mobile-after-upload');
     await pctx.close();
-    await go('/', 'Automation alerts'); await shot('32-dashboard-v2');
+    await go('/dashboard', 'Automation alerts'); await shot('32-dashboard-v2');
+    // ---- v3 screens: walk them for console/CSP errors (v3 review screenshots come from scripts/screenshots-v3.js)
+    await go('/', 'Next best action'); await go('/pipeline/health', 'Volume by step'); await go('/search?q=avery', 'Avery'); await go('/more', 'Numbers board');
+    await go('/deals/' + d6 + '/next', 'Move to'); await go('/deals/' + d6 + '/summary', 'NOT A COMMITMENT TO LEND');
+    await go('/new', 'What kind of loan is this?');
+    await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[name=loan_type][value=dscr]')]);
+    await page.type('input[name=first_name]', 'Smokey'); await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('.wiz-nav button')]);
+    await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[name=transaction_type][value=purchase]')]);
+    await page.type('input[name=property_address]', '9 Smoke Ln'); await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('.wiz-nav button')]);
+    for (let i = 0; i < 3; i++) await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('.wiz-nav button.primary')]);
+    await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('.wiz-nav button.primary')]);
+    if (!db.prepare("SELECT id FROM deals WHERE property_address = '9 Smoke Ln'").get()) throw new Error('wizard did not create the deal');
+    await page.focus('body'); await page.keyboard.press('/'); await page.keyboard.type('avery');
+    await page.waitForSelector('#cmd-results a', { visible: true, timeout: 5000 });
     await ctx.close();
   } catch (e) { problems.push('FAIL: ' + e.message); try { await shot('zz-failure'); } catch (_) { /* ignore */ } }
   await browser.close(); server.close(); fs.rmSync(dir, { recursive: true, force: true });

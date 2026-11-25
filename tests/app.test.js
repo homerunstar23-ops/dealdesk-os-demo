@@ -69,8 +69,8 @@ describe('modules', () => {
   const post = (url, data) => a.post(url).type('form').send(Object.assign({ _csrf: a.csrf }, data));
 
   test('dashboard: pipeline by stage, tasks, intakes, conditions, unpaid (demo data, labeled DEMO)', async () => {
-    const r = await a.get('/'); assert.equal(r.status, 200);
-    for (const s of ['Open pipeline', 'Tasks overdue / due today', 'New intakes to review', 'Outstanding conditions', 'Unpaid fee requests', 'Conditionally Approved', 'Clear to Close']) assert.ok(r.text.includes(s), s);
+    const r = await a.get('/dashboard'); assert.equal(r.status, 200); // v3: classic numbers board moved from / to /dashboard
+    for (const s of ['Open pipeline', 'Tasks overdue / due today', 'New applications to review', 'Waiting on borrower', 'Unpaid fee requests', 'Conditionally Approved', 'Clear to Close']) assert.ok(r.text.includes(s), s);
     assert.ok(r.text.includes('DEMO')); assert.ok(ctx.db.prepare('SELECT COUNT(*) n FROM deals WHERE is_demo = 1').get().n >= 9);
     assert.equal(ctx.db.prepare("SELECT COUNT(*) n FROM contacts WHERE is_demo = 1 AND email NOT LIKE '%@example.com'").get().n, 0);
   });
@@ -100,7 +100,8 @@ describe('modules', () => {
     await post('/tasks', { title: 'Overdue test task', due_date: '2020-01-01' });
     const t = ctx.db.prepare("SELECT * FROM tasks WHERE title = 'Overdue test task'").get();
     assert.ok((await a.get('/tasks?f=overdue')).text.includes('Overdue test task'));
-    assert.ok((await a.get('/')).text.includes('Overdue test task'));
+    assert.ok((await a.get('/')).text.includes('Overdue test task')); // v3 Today queue surfaces overdue tasks
+    assert.ok((await a.get('/dashboard')).text.includes('Overdue test task'));
     await post('/tasks/' + t.id + '/toggle', {}); assert.equal(ctx.db.prepare('SELECT done FROM tasks WHERE id = ?').get(t.id).done, 1);
   });
 
@@ -130,7 +131,8 @@ describe('modules', () => {
     const c = ctx.db.prepare('SELECT * FROM contacts WHERE id = ?').get(d.contact_id); assert.equal(c.sms_consent, 1); assert.ok(c.sms_consent_at); assert.equal(c.consent_method, 'Public intake form checkbox');
     assert.ok(ctx.db.prepare("SELECT COUNT(*) n FROM conditions WHERE deal_id = ?").get(d.id).n > 10);
     assert.ok(ctx.db.prepare("SELECT COUNT(*) n FROM tasks WHERE deal_id = ? AND title LIKE 'Review new intake%'").get(d.id).n === 1);
-    assert.ok((await a.get('/')).text.includes('Ivy Intake'));
+    assert.ok((await a.get('/dashboard')).text.includes('Ivy Intake'));
+    assert.match((await a.get('/')).text, /Call Ivy about the new application/); // v3 Today: new intake is a next-best action
     // honeypot: silently dropped
     const n0 = ctx.db.prepare('SELECT COUNT(*) n FROM deals').get().n;
     await pub.post('/apply').type('form').send({ _csrf: t, website: 'spam', first_name: 'Bot', last_name: 'Bot', email: 'b@example.com', loan_type: 'dscr', city: 'X', state: 'FL', ack: '1' });
@@ -208,7 +210,7 @@ describe('modules', () => {
     assert.equal(ctx.db.prepare('SELECT COUNT(*) n FROM payments WHERE deal_id = ?').get(d.id).n, 0);
     await post('/deals/' + d.id + '/payments', { kind: 'appraisal', amount: '650', description: 'Appraisal fee', payment_url: 'https://pay.example.com/abc' });
     const p = ctx.db.prepare('SELECT * FROM payments WHERE deal_id = ?').get(d.id); assert.equal(p.amount_cents, 65000); assert.equal(p.status, 'requested'); assert.equal(p.provider, 'manual');
-    assert.ok((await a.get('/')).text.includes('Appraisal fee'));
+    assert.ok((await a.get('/dashboard')).text.includes('Appraisal fee'));
     await post('/payments/' + p.id + '/status', { status: 'paid' }); assert.ok(ctx.db.prepare('SELECT paid_at FROM payments WHERE id = ?').get(p.id).paid_at);
     await post('/payments/' + p.id + '/status', { status: 'refunded' }); assert.ok(ctx.db.prepare('SELECT refunded_at FROM payments WHERE id = ?').get(p.id).refunded_at);
     const pg = await a.get('/deals/' + d.id + '/payments'); assert.ok(pg.text.includes('per-transaction fee'));

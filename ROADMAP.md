@@ -3,7 +3,10 @@
 v1 = internal CRM/pipeline/underwriting system. **v2 (done 2026-11-25):** investor status portal, automation
 engine (stage-change updates, intake acknowledgement, doc reminders, nurture sequences, stale alerts, daily
 digest), Outbox with consent gates + kill switch, unsubscribe + STOP handling. Sending is simulated until
-Cory adds credentials (docs/SENDING.md). Remaining items below note cost and the approval they need.
+Cory adds credentials (docs/SENDING.md). **v3 (done 2026-11-25):** Today next-best-action home, New-deal
+wizard, one-button "Move to next step" with a what's-missing checklist, search/command bar, pipeline health
+charts, term-sheet-style deal summary, investor portal redesign with an LO-entered expected date, plain-English
+UI and a new mobile-first design. Remaining items below note cost and the approval they need.
 
 | Item | What | Free path | Paid / notes | Needs |
 |---|---|---|---|---|
@@ -22,7 +25,7 @@ Cory adds credentials (docs/SENDING.md). Remaining items below note cost and the
 | Calendar booking | Booking link + automatic follow-up task | Google Calendar API ($0) | — | — |
 | Weekly status cadence | Friday S-2 status email per active file via the automation engine | Build in-app ($0) | — | Sponsor approval |
 | Draw management | Rehab draw requests, inspections, holdback tracking | Build in-app ($0) | Inspection vendors paid | — |
-| Reporting | Funded volume, conversion by lead source, cycle time by stage, CSV export | Build in-app ($0) | — | — |
+| Reporting | **v3 added pipeline health charts** (volume, days in step, aging, closed by month, mix). Next: conversion by lead source, CSV export | Build in-app ($0) | — | — |
 | Serverless port | Move to Cloudflare Workers + D1 + R2 | Free tiers | Paid tiers if limits exceeded | — |
 | Malware scan on uploads | ClamAV on the VM | Free (CPU) | — | — |
 | Audit export | Exportable activity log for compliance reviews | Build in-app ($0) | — | — |

@@ -1,4 +1,4 @@
-# DealDesk OS (v2) — a DealSheet Lab project
+# DealDesk OS (v3) — a DealSheet Lab project
 
 One login, one app, $0 to run: CRM, loan pipeline, public deal intake ("deal collector"), deal analyzer,
 underwriting-support workspace, borrower document collection, appraisal/fee payment requests, dashboard,
@@ -22,8 +22,9 @@ cd /workspace/lending-platform
 npm ci                 # Node 20+ (tested on Node 24)
 npm run setup          # first time only: writes .env + secrets/admin-login.txt (chmod 600)
 npm start              # http://127.0.0.1:4100  (or: pm2 start ecosystem.config.js)
-npm test               # API + calculator + v2 automation/portal tests
+npm test               # API + calculator + v2 automation/portal + v3 Today/wizard/gates tests
 npm run smoke          # headless Chrome walk-through of every module -> screenshots-review/
+node scripts/screenshots-v3.js  # v3 review screenshots (desktop + mobile) from the LOCAL pm2 instance
 ```
 
 - **Login:** email + password are in `secrets/admin-login.txt` (never committed, never printed).
@@ -45,7 +46,7 @@ npm run smoke          # headless Chrome walk-through of every module -> screens
 | 5 | Underwriting workspace | `/deals/:id/underwriting` | Per-loan-type document checklist (from the toolkit's requirement matrix) + condition tracker (open → requested → received → reviewed → cleared / waived, with dates), red-flag escalation checklist, UW notes, scenario-desk summary export (`/deals/:id/scenario.txt`, initials only, no address/email) |
 | 6 | Document collection | `/deals/:id/documents`, `/u/:token` | Per-deal expiring borrower upload link (random 256-bit token, stored hashed, shown once, revocable). PDF/JPG/PNG/HEIC/DOC(X)/XLS(X)/CSV/TXT, content-checked, 15 MB max. Files stored in `data/uploads` (outside the web root, chmod 600) and downloaded only by logged-in staff |
 | 7 | Appraisal / fee payments | `/deals/:id/payments` | Record a fee request (amount, status requested/paid/refunded/canceled, dates) with a payment link. If `STRIPE_SECRET_KEY` is a **test** key, it can create a Stripe Payment Link; live keys are refused in v1. Otherwise paste a link. Optional signed webhook marks payments paid |
-| 8 | Dashboard | `/` | Pipeline count/value by stage, tasks overdue/due today, new intakes, outstanding conditions, unpaid fee requests, recent activity |
+| 8 | Numbers board (was Dashboard) | `/dashboard` | Pipeline count/value by stage, tasks overdue/due today, new intakes, outstanding conditions, unpaid fee requests, recent activity |
 | 9 | Templates | `/templates` | 29 email/SMS/call/DM templates from the LO toolkit with merge fields filled from a deal/contact; copy-to-clipboard only; DNC and no-SMS-consent warnings; add custom templates |
 | 10 | Compliance | `/compliance` | The toolkit's compliance guides (RESPA, TCPA, CAN-SPAM, fair lending, SAFE/NMLS, business purpose, state variance, record retention, attorney-review list) + playbooks; responsibility note; global footer disclaimer on every page |
 
@@ -63,6 +64,28 @@ Turning real sending on: see **`docs/SENDING.md`** (Gmail app password / Brevo f
 optional and paid). Demo v2 data: Avery's "3 Sampleton St" deal has a portal (verify with
 `avery.sample@example.com` + `0101`); the Outbox has held and consent-blocked demo messages.
 
+## v3: an institutional-style deal desk that anyone can run (what's new)
+
+Open the app and you land on **Today**: one big card that says the single most useful thing to do next.
+
+| Feature | Where | What it does |
+|---|---|---|
+| **Today** (home) | `/` | ONE next-best-action card at a time ("Call Casey about the new application") with **Do it / Done / Skip**, plus a ranked "Up next" list. Built only from your data: new online applications, overdue and due-today tasks, documents waiting for review, Outbox messages waiting for approval, deals ready to move, items a borrower has owed for 3+ days, deals with no changes in 7+ days, unpaid fee requests, and investors with no expected next-step date. **Done** does the safe thing (completes the task, marks the application reviewed, marks received docs reviewed) and hides it for today; **Skip** hides it until tomorrow. Big "all caught up" empty state |
+| **New-deal wizard** | `/new` (the "+ New deal" button everywhere) | One question per screen, big buttons, a progress bar, plain-English labels, sensible defaults (FL, single family, 1 unit, close in 30 days, follow-up tomorrow, status page on). Questions adapt to the loan type (rent for DSCR/cash-out, repair budget + ARV for flips and builds, payoff for refis; cash-out skips "buying or refinancing?"). Creates the person (email/text permission **off** unless you tick it), the deal, the loan-type checklist, a follow-up task and the investor status page. Sends nothing. The classic all-fields form is still at `/deals/new` ("Full deal form" under More) |
+| **Move to next step** | Deal page (big button) + `/deals/:id/next` | Each deal has one button. It shows a checklist of exactly what's missing before the deal can advance (e.g. "You sent the investor their document list", "Every needed document is in", "Every item on the list is done or not needed", "No unpaid fee requests"), each with a "fix it" link. Steps only the lender decides ("the underwriter sent back conditions", "clear-to-close", "closed and funded") are explicit **you confirm** boxes — the app never makes credit decisions. Moving runs the same automations as before. "Change step manually" stays available for corrections |
+| **Expected next-step date** | Deal page "What the investor sees" + move screen | You enter a date (and an optional short note). The investor sees it as an estimate, not a promise; past dates are hidden. Notes with approval / rate / guarantee words or percentages are refused |
+| **Search / command bar** | Top bar (press `/` or Ctrl/Cmd+K), `/search` | Live results for deals, people, companies, tasks and commands ("new deal", "outbox", "health"…). Arrow keys + Enter |
+| **Pipeline health** | `/pipeline/health` | Simple charts from the app's own data only: volume by step (count + requested $), average/longest days in step, aging since last update, closed by month (6 months), loan type mix, oldest deals in their step. Server-rendered SVG (no tracking, no external scripts), prints cleanly |
+| **Deal summary (term-sheet style)** | `/deals/:id/summary` | One-page internal summary: current/next step, checklist progress, borrower (self-reported fields labeled), property, loan request, simple ratios (LTV, LTC, loan-to-ARV) and the analyzer headline. Stamped **INTERNAL SUMMARY — NOT A COMMITMENT TO LEND**; "Print / save as PDF" gives a clean letter-size page |
+| **Investor portal redesign** | `/p/<token>` | Big "Step 5 of 7 · Conditions issued" status block with a progress bar, chips for "2 items needed from you" and "Next step expected around …", the 7-step timeline, three cards (**What happens now / What we need from you / What happens next** with your date), upload buttons, received items, updates, your contact card and a wire-safety card. Same disclaimers; no approval language |
+| **Plain English everywhere** | All staff screens | Friendly step names with the lender term in a tooltip: New lead · Application · Collecting documents · Lender reviewing · Clearing final items (Conditionally Approved) · Ready to close · Closed. Checklist statuses: Not asked yet · **Waiting on borrower** · Got it — needs review · Reviewed · Done · Not needed. "?" help tooltips on the jargon (LTV, ARV, DSCR, consent, status page…) |
+| **Look & feel** | Everywhere | Navy/emerald/gold design system, refined type and spacing, status chips, empty states, loading spinners on every button and a top loading bar, five-item main nav + "More", a thumb-friendly **bottom bar on phones** (Today · Deals · ＋New · Search · More), 44–58px tap targets |
+
+Everything from v1/v2 still works (CRM, analyzer, underwriting worksheet, deal collector, upload links, fee
+requests, automations, Outbox + kill switch, consent gating). **Automated sending is still OFF and
+`OUTBOUND_DRY_RUN=1` on the demo.** In `DEMO_MODE` the demo investor's status-page link is now derived from
+`SESSION_SECRET`, so it survives the free host's restarts (real deals always get random links).
+
 ## File map
 
 ```
@@ -75,6 +98,13 @@ src/seed.js               admin bootstrap, settings, template import, FAKE demo 
 src/reference.js          reads reference/lo-toolkit (doc matrix, conditions, red flags, templates, compliance)
 src/lib/calc.js, memo.js  deal math + memo engine (ported unchanged from DealSheet Lab)
 src/lib/model.js          dashboard queries, checklist seeding, analyzer defaults, merge fields
+src/lib/plain.js          v3 plain-English labels, help tooltips, borrower-text guard (no approval/rate words)
+src/lib/gates.js          v3 "Move to next step" checklists per step + shared stage move
+src/lib/today.js          v3 Today queue: ranked next-best actions, Done/Skip
+src/routes/today.js       v3 Today home (/), search + command bar (/search, /search.json), /more
+src/routes/wizard.js      v3 New-deal wizard (/new/...)
+src/routes/insights.js    v3 pipeline health, move-to-next-step screen, expected date, deal summary
+src/views/charts.js       v3 server-rendered SVG charts
 src/lib/security.js       session store, CSRF, auth guards
 src/lib/uploads.js        upload limits + magic-byte checks + storage
 src/lib/stripe.js         Payment Links (test mode only) + webhook signature check

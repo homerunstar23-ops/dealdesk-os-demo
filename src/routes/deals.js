@@ -12,17 +12,22 @@ const ref = require('../reference');
 const up = require('../lib/uploads');
 const stripe = require('../lib/stripe');
 const A = require('../views/analysis');
+const gates = require('../lib/gates');
+const P = require('../lib/plain');
 const { notesBlock, activityBlock, tasksBlock, fullName } = require('./crm').helpers;
+const { nextCard } = require('./insights');
 
 const TX = [['purchase', 'Purchase'], ['refi', 'Rate/term refi'], ['cashout', 'Cash-out refi']];
 const PROPERTY_TYPES = ['Single family', '2-4 unit', 'Condo / townhome', '5+ unit multifamily', 'Mixed use', 'Lot / new construction', 'Other'];
 const DEAL_NUM = ['purchase_price', 'as_is_value', 'rehab_budget', 'arv', 'monthly_rent', 'payoff', 'loan_amount', 'liquidity'];
 
 function subnav(d, active) {
-  const tabs = [['', 'Overview'], ['/analyze', 'Deal analyzer'], ['/underwriting', 'Underwriting'], ['/documents', 'Documents'], ['/payments', 'Fees & payments']];
-  return html`<div class="page-head"><div><h1>${d.name}${demoTag(d)}</h1><p class="muted"><span class="${stageClass(d.stage)}">${d.stage}</span> · ${LOAN_TYPES[d.loan_type]} · ${money(d.loan_amount)} requested ${d.borrower ? html`· <a href="/contacts/${d.contact_id}">${d.borrower}</a>` : ''}</p></div>
-<form method="post" action="/deals/${d.id}/stage" class="inline stage-move" data-csrf>${raw('')}<input type="hidden" name="_csrf" value="${d._csrf}"><select name="stage">${STAGES.map(s => html`<option ${s === d.stage ? 'selected' : ''}>${s}</option>`)}</select><button class="btn small">Move</button></form></div>
-<nav class="tabs">${tabs.map(([p, l]) => html`<a href="/deals/${d.id}${p}" class="${active === p ? 'active' : ''}">${l}</a>`)}</nav>`;
+  const tabs = [['', 'Overview'], ['/analyze', 'Numbers'], ['/underwriting', 'Checklist'], ['/documents', 'Documents'], ['/payments', 'Fees']];
+  const tips = { '/analyze': 'Deal analyzer: DSCR, flip, BRRRR and rental math (educational estimates).', '/underwriting': 'Underwriting support: the document checklist, lender conditions and the red-flag review.', '/payments': 'Appraisal and other third-party fee requests.' };
+  return html`<div class="page-head deal-head"><div><p class="eyebrow">${P.LOAN_PLAIN[d.loan_type]} · ${money(d.loan_amount)} requested</p><h1>${d.name}${demoTag(d)}</h1><p class="muted">${P.stageChip(d.stage, { long: true })} ${d.borrower ? html`· <a href="/contacts/${d.contact_id}">${d.borrower}</a>` : ''}</p></div>
+<div class="head-actions">${gates.NEXT[d.stage] ? html`<a class="btn primary" href="/deals/${d.id}/next">Move to next step →</a>` : ''} <a class="btn ghost" href="/deals/${d.id}/summary" target="_blank" rel="noopener">Deal summary (PDF)</a>
+<details class="manual-move"><summary>Change step manually</summary><form method="post" action="/deals/${d.id}/stage" class="stage-move" data-csrf><input type="hidden" name="_csrf" value="${d._csrf}"><select name="stage" aria-label="Step">${STAGES.map(s => html`<option value="${s}" ${s === d.stage ? 'selected' : ''}>${P.STAGE_PLAIN[s]}${P.STAGE_PLAIN[s] !== s ? ' (' + s + ')' : ''}</option>`)}</select><button class="btn small">Move</button><small class="muted">Skips the checklist. Use for corrections.</small></form></details></div></div>
+<nav class="tabs">${tabs.map(([p, l]) => html`<a href="/deals/${d.id}${p}" class="${active === p ? 'active' : ''}" title="${tips[p] || ''}">${l}</a>`)}</nav>`;
 }
 
 function dealForm(csrf, d, contacts, companies) {
@@ -73,28 +78,25 @@ module.exports = (app) => {
     if (stage) { sql += ' AND d.stage = ?'; p.push(stage); }
     if (lt) { sql += ' AND d.loan_type = ?'; p.push(lt); }
     const deals = db.prepare(sql + ' ORDER BY d.target_close_date IS NULL, d.target_close_date, d.id').all(...p);
-    const filters = html`<form class="filters" method="get"><input type="hidden" name="view" value="${view}"><select name="stage"><option value="">All stages</option>${STAGES.map(s => html`<option ${s === stage ? 'selected' : ''}>${s}</option>`)}</select>
+    const filters = html`<form class="filters" method="get"><input type="hidden" name="view" value="${view}"><select name="stage"><option value="">All steps</option>${STAGES.map(s => html`<option value="${s}" ${s === stage ? 'selected' : ''}>${P.STAGE_PLAIN[s]}</option>`)}</select>
 <select name="loan_type"><option value="">All loan types</option>${Object.entries(LOAN_TYPES).map(([k, v]) => html`<option value="${k}" ${k === lt ? 'selected' : ''}>${v}</option>`)}</select>${view === 'kanban' ? html`<label class="check"><input type="checkbox" name="closed" value="1" ${showClosed ? 'checked' : ''}> show Closed/Dead</label>` : ''}<button class="btn small">Filter</button></form>`;
-    const head = html`<div class="page-head"><h1>Pipeline</h1><div><nav class="seg"><a href="/pipeline?view=kanban" class="${view === 'kanban' ? 'active' : ''}">Kanban</a><a href="/pipeline?view=table" class="${view === 'table' ? 'active' : ''}">Table</a></nav> <a class="btn" href="/deals/new">+ New deal</a></div></div>${filters}`;
+    const head = html`<div class="page-head"><h1>Deals</h1><div><nav class="seg"><a href="/pipeline?view=kanban" class="${view === 'kanban' ? 'active' : ''}">Kanban</a><a href="/pipeline?view=table" class="${view === 'table' ? 'active' : ''}">Table</a></nav> <a class="btn" href="/pipeline/health">Health</a> <a class="btn primary" href="/new">+ New deal</a></div></div>${filters}`;
     if (view === 'table') {
-      return res.page('Pipeline', '/pipeline', html`${head}<table class="card"><thead><tr><th>Deal</th><th>Stage</th><th>Type</th><th>Borrower</th><th class="num">Loan</th><th>Assigned</th><th>App date</th><th>Target close</th><th class="num">Open conds</th></tr></thead><tbody>
-${deals.map(d => html`<tr><td><a href="/deals/${d.id}">${d.name}</a>${demoTag(d)}${d.source === 'intake' && !d.intake_reviewed ? html` ${badge('NEW', 'hot')}` : ''}</td><td><span class="${stageClass(d.stage)}">${d.stage}</span></td><td>${LOAN_TYPES[d.loan_type]}</td><td>${d.borrower || '—'}</td><td class="num">${money(d.loan_amount)}</td><td>${d.assignee || '—'}</td><td>${fmtDate(d.app_date)}</td><td>${fmtDate(d.target_close_date)}</td><td class="num">${d.open_conds}</td></tr>`)}
+      return res.page('Pipeline', '/pipeline', html`${head}<table class="card"><thead><tr><th>Deal</th><th>Stage</th><th>Type</th><th>Borrower</th><th class="num">Loan</th><th>Assigned</th><th>App date</th><th>Target close</th><th class="num">Waiting items</th></tr></thead><tbody>
+${deals.map(d => html`<tr><td><a href="/deals/${d.id}">${d.name}</a>${demoTag(d)}${d.source === 'intake' && !d.intake_reviewed ? html` ${badge('NEW', 'hot')}` : ''}</td><td>${P.stageChip(d.stage)}</td><td>${LOAN_TYPES[d.loan_type]}</td><td>${d.borrower || '—'}</td><td class="num">${money(d.loan_amount)}</td><td>${d.assignee || '—'}</td><td>${fmtDate(d.app_date)}</td><td>${fmtDate(d.target_close_date)}</td><td class="num">${d.open_conds}</td></tr>`)}
 </tbody><tfoot><tr><th colspan="4">${deals.length} deals</th><th class="num">${money(deals.reduce((a, d) => a + (d.loan_amount || 0), 0))}</th><th colspan="4"></th></tr></tfoot></table>`);
     }
     const cols = (stage ? [stage] : STAGES.filter(s => showClosed || OPEN_STAGES.includes(s)));
-    res.page('Pipeline', '/pipeline', html`${head}<div class="kanban">${cols.map(s => { const list = deals.filter(d => d.stage === s); return html`<section class="col"><h3><span class="${stageClass(s)}">${s}</span> <small>${list.length} · ${money(list.reduce((a, d) => a + (d.loan_amount || 0), 0))}</small></h3>
-${list.map(d => html`<article class="kcard"><a href="/deals/${d.id}"><strong>${d.name}</strong></a>${demoTag(d)}${d.source === 'intake' && !d.intake_reviewed ? html` ${badge('NEW', 'hot')}` : ''}<div class="small muted">${d.borrower || '—'} · ${LOAN_TYPES[d.loan_type]}</div><div class="small">${money(d.loan_amount)} · close ${fmtDate(d.target_close_date)}${d.open_conds ? html` · ${d.open_conds} open cond.` : ''}</div>
-<form method="post" action="/deals/${d.id}/stage" class="kmove">${csrfInput(res.locals.csrf)}<select name="stage" aria-label="Move stage">${STAGES.map(x => html`<option ${x === d.stage ? 'selected' : ''}>${x}</option>`)}</select><button class="btn tiny">Move</button></form></article>`)}</section>`; })}</div>`);
+    res.page('Pipeline', '/pipeline', html`${head}<div class="kanban">${cols.map(s => { const list = deals.filter(d => d.stage === s); return html`<section class="col"><h3>${P.stageChip(s)} <small>${list.length} · ${money(list.reduce((a, d) => a + (d.loan_amount || 0), 0))}</small></h3>
+${list.map(d => html`<article class="kcard"><a href="/deals/${d.id}"><strong>${d.name}</strong></a>${demoTag(d)}${d.source === 'intake' && !d.intake_reviewed ? html` ${badge('NEW', 'hot')}` : ''}<div class="small muted">${d.borrower || '—'} · ${LOAN_TYPES[d.loan_type]}</div><div class="small">${money(d.loan_amount)} · close ${fmtDate(d.target_close_date)}${d.open_conds ? html` · ${d.open_conds} open item${d.open_conds > 1 ? 's' : ''}` : ''}</div>
+<form method="post" action="/deals/${d.id}/stage" class="kmove">${csrfInput(res.locals.csrf)}<select name="stage" aria-label="Move stage">${STAGES.map(x => html`<option value="${x}" ${x === d.stage ? 'selected' : ''}>${P.STAGE_PLAIN[x]}</option>`)}</select><button class="btn tiny">Move</button></form></article>`)}</section>`; })}</div>`);
   });
 
   app.post('/deals/:id/stage', (req, res, next) => {
     const d = db.prepare('SELECT id, stage FROM deals WHERE id = ?').get(req.params.id); if (!d) return next();
     const s = oneOf(req.body.stage, STAGES); if (!s || s === d.stage) return res.redirect(backTo(req, '/deals/' + d.id));
-    db.prepare("UPDATE deals SET stage = ?, updated_at = datetime('now'), closed_date = CASE WHEN ? = 'Closed' AND closed_date IS NULL THEN ? ELSE closed_date END, app_date = CASE WHEN ? = 'Application' AND app_date IS NULL THEN ? ELSE app_date END WHERE id = ?").run(s, s, todayISO(), s, todayISO(), d.id);
-    model.log(db, { entity_type: 'deal', entity_id: d.id, action: 'stage.changed', detail: `${d.stage} → ${s}`, user_id: req.user.id });
-    const r = app.locals.engine.onStageChange(d.id, d.stage, s, { userId: req.user.id });
-    const msgs = r && r.messages ? r.messages : [];
-    req.flash(`Moved to ${s}.` + (r && !r.skipped ? ` Automation: ${r.tasks} task(s), portal update posted${msgs.length ? `, ${msgs.length} message(s) → Outbox (${msgs.map(m => m.status).join(', ')})` : ''}.` : '')); res.redirect(backTo(req, '/deals/' + d.id));
+    const r = gates.moveStage(db, app.locals.engine, d.id, s, { userId: req.user.id });
+    req.flash(r.msg); res.redirect(backTo(req, '/deals/' + d.id));
   });
 
   // ---- Deal CRUD -------------------------------------------------------------------------------
@@ -135,6 +137,7 @@ ${list.map(d => html`<article class="kcard"><a href="/deals/${d.id}"><strong>${d
     const an = model.getAnalysis(d); const out = model.runAnalysis(an.strategy, an.inputs[an.strategy], d);
     const payments = db.prepare('SELECT * FROM payments WHERE deal_id = ? ORDER BY id DESC').all(d.id);
     res.page(d.name, '/pipeline', html`${subnav(d, '')}
+${nextCard(db, d, res.locals.csrf)}
 ${d.source === 'intake' && !d.intake_reviewed ? html`<div class="flash hot"><strong>New intake from the public form.</strong> Review it, confirm consent before contacting, then mark reviewed. <form method="post" action="/deals/${d.id}/reviewed" class="inline">${csrfInput(res.locals.csrf)}<button class="btn small">Mark reviewed</button></form></div>` : ''}
 <div class="grid2"><section class="card"><div class="card-head"><h2>Deal details</h2><a class="btn small ghost" href="/deals/${d.id}/edit">Edit</a></div><dl class="dl">
 <dt>Borrower</dt><dd>${d.contact_id ? html`<a href="/contacts/${d.contact_id}">${d.borrower}</a>` : '—'}</dd><dt>Vesting</dt><dd>${d.entity ? html`<a href="/companies/${d.company_id}">${d.entity}</a>` : 'Individual / TBD'}</dd>
@@ -146,7 +149,7 @@ ${d.source === 'intake' && !d.intake_reviewed ? html`<div class="flash hot"><str
 <dt>Source</dt><dd>${d.lead_source || '—'}${d.source === 'intake' ? ' (public intake)' : ''}</dd>${d.dead_reason ? html`<dt>Dead reason</dt><dd>${d.dead_reason}</dd>` : ''}</dl></section>
 <section class="card"><h2>At a glance</h2><div class="kpis mini">
 <div class="kpi"><span>${A.STRATS[an.strategy]}</span><strong>${an.strategy === 'dscr' ? (out.result.dscr ? out.result.dscr.toFixed(2) + 'x DSCR' : '—') : an.strategy === 'flip' ? money(out.result.profit) + ' profit' : an.strategy === 'brrrr' ? money(out.result.cashLeftInDeal) + ' left in' : money(out.result.cashFlowMonthly) + '/mo'}</strong><small>${an.isDefault ? 'Using starter assumptions' : 'Saved ' + fmtDateTime(an.savedAt)} · <a href="/deals/${d.id}/analyze">open analyzer</a></small></div>
-<div class="kpi"><span>Checklist</span><strong>${(cond.cleared || 0)} cleared</strong><small>${cond.requested || 0} requested · ${cond.received || 0} received · ${cond.reviewed || 0} in review · ${cond.open || 0} not yet requested</small></div>
+<div class="kpi"><span>Checklist</span><strong>${(cond.cleared || 0)} done</strong><small>${cond.requested || 0} waiting on borrower · ${cond.received || 0} need review · ${cond.reviewed || 0} reviewed · ${cond.open || 0} not asked yet</small></div>
 <div class="kpi"><span>Fees</span><strong>${payments.filter(p => p.status === 'requested').length} unpaid</strong><small>${payments.filter(p => p.status === 'paid').length} paid · <a href="/deals/${d.id}/payments">manage</a></small></div></div>
 <p><a class="btn small" href="/deals/${d.id}/estimate?s=${an.strategy}" target="_blank" rel="noopener">Printable estimate</a> <a class="btn small ghost" href="/deals/${d.id}/scenario.txt">Scenario-desk export</a> <a class="btn small ghost" href="/templates?deal_id=${d.id}">Templates for this deal</a></p></section>
 ${portalPanel(db, app.locals.engine, d, res.locals.csrf)}${dealOutbox(db, d.id)}
@@ -207,17 +210,17 @@ ${out.memo ? html`<h2>Items to review</h2><ul>${out.memo.risks.concat(out.memo.s
     const counts = COND_STATUSES.map(s => [s, conds.filter(c => c.status === s).length]);
     const rf = ref.redFlags(); const sections = [...new Set(rf.map(r => r.section))];
     const common = ref.commonConditions();
-    const row = (c) => html`<tr class="st-${c.status}"><td>${c.title}${c.requirement === 'C' ? html` <span class="badge muted" title="${ref.REQ_LABEL.C}">if applicable</span>` : ''}${c.kind === 'condition' ? html` <span class="badge">condition</span>` : ''}${c.borrower_visible ? '' : html` <span class="badge muted" title="Not shown on the borrower portal">internal</span>`}<div class="small muted">${c.category || ''}${c.n_files ? html` · <a href="/deals/${d.id}/documents">${c.n_files} file(s)</a>` : ''}</div></td>
-<td><form method="post" action="/conditions/${c.id}" class="cond-form">${csrfInput(res.locals.csrf)}<select name="status">${COND_STATUSES.map(s => html`<option ${s === c.status ? 'selected' : ''}>${s}</option>`)}</select><input name="note" value="${c.note || ''}" placeholder="Internal note (never shown to borrower)" maxlength="500">
+    const row = (c) => html`<tr class="st-${c.status}"><td>${c.title}${c.requirement === 'C' ? html` <span class="badge muted" title="${ref.REQ_LABEL.C}">if applicable</span>` : ''}${c.kind === 'condition' ? html` <span class="badge" title="An item the lender's underwriter asked for (a condition)">from lender</span>` : ''}${c.borrower_visible ? '' : html` <span class="badge muted" title="Not shown on the borrower portal">internal</span>`}<div class="small muted">${c.category || ''}${c.n_files ? html` · <a href="/deals/${d.id}/documents">${c.n_files} file(s)</a>` : ''}</div></td>
+<td><form method="post" action="/conditions/${c.id}" class="cond-form">${csrfInput(res.locals.csrf)}<select name="status" aria-label="Status">${COND_STATUSES.map(s => html`<option value="${s}" ${s === c.status ? 'selected' : ''}>${P.COND_PLAIN[s]}</option>`)}</select><input name="note" value="${c.note || ''}" placeholder="Internal note (never shown to borrower)" maxlength="500">
 <input type="hidden" name="bv_present" value="1"><label class="check tiny-check" title="Show this item (in borrower wording) on the borrower status portal and in automated reminders"><input type="checkbox" name="borrower_visible" value="1" ${c.borrower_visible ? 'checked' : ''}> Borrower sees</label>
 <input name="borrower_text" value="${c.borrower_text || ''}" placeholder="Borrower-facing wording (optional)" maxlength="300"><button class="btn tiny">Save</button></form></td>
 <td class="small">${c.requested_at ? html`Req ${fmtDate(c.requested_at)}<br>` : ''}${c.received_at ? html`Rcvd ${fmtDate(c.received_at)}<br>` : ''}${c.cleared_at ? html`Clr ${fmtDate(c.cleared_at)}` : ''}</td></tr>`;
     res.page('Underwriting · ' + d.name, '/pipeline', html`${subnav(d, '/underwriting')}
 <div class="notice"><strong>Underwriting support workspace — not a credit decision.</strong> Tracks documents and conditions and helps you prepare files and escalate questions. Actual conditions and decisions come only from the lender's underwriting through company systems.</div>
-<div class="kpis mini">${counts.map(([s, n]) => html`<div class="kpi st-${s}"><span>${s}</span><strong>${n}</strong></div>`)}</div>
-<div class="toolbar"><form method="post" action="/deals/${d.id}/conditions/bulk" class="inline">${csrfInput(res.locals.csrf)}<input type="hidden" name="from" value="open"><input type="hidden" name="to" value="requested"><button class="btn small">Mark all "open" items as requested</button></form>
+<div class="kpis mini">${counts.map(([s, n]) => html`<div class="kpi st-${s}" title="${P.COND_HELP[s]}"><span>${P.COND_PLAIN[s]}</span><strong>${n}</strong></div>`)}</div>
+<div class="toolbar"><form method="post" action="/deals/${d.id}/conditions/bulk" class="inline">${csrfInput(res.locals.csrf)}<input type="hidden" name="from" value="open"><input type="hidden" name="to" value="requested"><button class="btn small">Ask the borrower for everything not asked yet</button></form>
 <a class="btn small ghost" href="/deals/${d.id}/scenario.txt">Download scenario-desk summary (.txt)</a> <a class="btn small ghost" href="/deals/${d.id}/documents">Send upload link</a></div>
-<section class="card"><h2>Document checklist & conditions</h2><p class="small muted">Seeded from the ${LOAN_TYPES[d.loan_type]} column of the document requirement matrix. Status flow: open → requested → received → reviewed → cleared (or waived).</p>
+<section class="card"><h2>Document checklist & conditions</h2><p class="small muted">Seeded from the ${LOAN_TYPES[d.loan_type]} column of the document requirement matrix. Status flow: not asked yet → waiting on borrower → got it, needs review → reviewed → done (or not needed).</p>
 <table class="conds"><thead><tr><th>Item</th><th>Status / note</th><th>Dates</th></tr></thead><tbody>${conds.map(row)}</tbody></table>
 <form method="post" action="/deals/${d.id}/conditions" class="row-form">${csrfInput(res.locals.csrf)}<input name="title" placeholder="Add a condition or document (as issued by underwriting)" maxlength="300" required list="common-conds"><datalist id="common-conds">${common.map(c => html`<option value="${c.text}">`)}</datalist>
 <select name="category"><option>Borrower / entity</option><option>Property / valuation</option><option>Rehab / construction</option><option>Closing</option><option>Other</option></select><button class="btn small">Add</button></form></section>

@@ -58,11 +58,14 @@ function createEngine({ db, config }) {
   const sendingOn = () => settings().automated_sending === '1';
 
   // ---- Portal links ------------------------------------------------------------------------------------
-  function createPortalLink(dealId, { verifyMode, userId } = {}) {
+  // DEMO_MODE only: a stable demo portal token derived from SESSION_SECRET, so the demo status-page link
+  // survives the free host's restarts/re-seeds. Never used for real deals (real links are random).
+  const demoToken = (label) => (config.demoMode ? crypto.createHmac('sha256', String(config.sessionSecret)).update('demo-portal:' + label).digest('base64url') : null);
+  function createPortalLink(dealId, { verifyMode, userId, token: fixedToken } = {}) {
     const d = db.prepare('SELECT d.id, c.email, c.phone FROM deals d LEFT JOIN contacts c ON c.id = d.contact_id WHERE d.id = ?').get(dealId);
     if (!d) return null;
     const mode = ['none', 'email', 'email_phone4'].includes(verifyMode) ? verifyMode : (d.phone && d.email ? 'email_phone4' : (d.email ? 'email' : 'none'));
-    const token = randomToken(32);
+    const token = fixedToken && /^[A-Za-z0-9_-]{40,100}$/.test(fixedToken) && !db.prepare('SELECT id FROM portal_links WHERE token_hash = ?').get(sha256(fixedToken)) ? fixedToken : randomToken(32);
     db.prepare('UPDATE portal_links SET revoked = 1 WHERE deal_id = ? AND revoked = 0').run(dealId); // one active link per deal
     db.prepare('INSERT INTO portal_links (deal_id, token_hash, token_enc, verify_mode, created_by) VALUES (?,?,?,?,?)').run(dealId, sha256(token), encrypt(token), mode, userId || null);
     model.log(db, { entity_type: 'deal', entity_id: dealId, action: 'portal.link_created', detail: `Status-portal link created (verification: ${mode})`, user_id: userId || null });
@@ -367,7 +370,7 @@ function createEngine({ db, config }) {
   }
   function stop() { if (task) { task.stop(); task = null; } }
 
-  return { RULES, rule, saveRule, runLog, notify, createPortalLink, activePortal, portalUrl, decrypt, postUpdate, consentCheck, render, queue, queueTemplate, preview, sendOne, dispatchDue, approve,
+  return { RULES, rule, saveRule, runLog, notify, demoToken, createPortalLink, activePortal, portalUrl, decrypt, postUpdate, consentCheck, render, queue, queueTemplate, preview, sendOne, dispatchDue, approve,
     onStageChange, onIntake, onDocReceived, enroll, stopEnrollments, processSequences, markReplied, unsubscribe, smsStop, processDocReminders, staleDeals, digest, tick, start, stop, sendingOn, footer };
 }
 module.exports = { createEngine, RULES, STAGE_DEFAULTS };

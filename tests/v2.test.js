@@ -289,7 +289,7 @@ describe('admin pages', () => {
     const t = ctx.db.prepare("SELECT id FROM templates WHERE code = 'A-stage-email'").get();
     await a.post('/automations/templates/' + t.id).type('form').send({ _csrf: a.csrf, subject: 'Status: {{STAGE_LABEL}}', body: 'Hi {{FIRST_NAME}} — {{PORTAL_LINK}}' });
     assert.equal(ctx.db.prepare('SELECT subject FROM templates WHERE id = ?').get(t.id).subject, 'Status: {{STAGE_LABEL}}');
-    const dash = await a.get('/'); assert.match(dash.text, /Messages waiting for approval/); assert.match(dash.text, /Automation alerts/);
+    const dash = await a.get('/dashboard'); assert.match(dash.text, /Messages waiting for approval/); assert.match(dash.text, /Automation alerts/);
     const contact = person(ctx.db, 'Riley'); const cp = await a.get('/contacts/' + contact.id); assert.match(cp.text, /Investor lead nurture/);
   });
   test('delete demo removes demo outbox rows and enrollments', async () => {

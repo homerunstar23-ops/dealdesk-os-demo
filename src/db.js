@@ -121,8 +121,14 @@ const V2_COLUMNS = {
   contacts: [['timezone', 'TEXT'], ['unsub_token', 'TEXT'], ['email_opt_out_at', 'TEXT'], ['sms_opt_out_at', 'TEXT'], ['replied_at', 'TEXT']],
   conditions: [['borrower_text', 'TEXT']],
   files: [['portal_link_id', 'INTEGER']],
-  deals: [['stage_changed_at', 'TEXT']]
+  deals: [['stage_changed_at', 'TEXT'], ['next_step_date', 'TEXT'], ['next_step_note', 'TEXT']]
 };
+// v3: "Today" queue dismissals (Done / Skip hide an item for the rest of the day).
+const SCHEMA_V3 = `
+CREATE TABLE IF NOT EXISTS today_dismissals (
+  item_key TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'skip', user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (item_key, day));
+`;
 function migrate(db) {
   db.exec(SCHEMA_V2);
   for (const [table, cols] of Object.entries(V2_COLUMNS)) {
@@ -130,6 +136,7 @@ function migrate(db) {
     cols.forEach(([c, type]) => { if (!have.includes(c)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${c} ${type}`); });
   }
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_unsub ON contacts(unsub_token)');
+  db.exec(SCHEMA_V3);
 }
 
 function openDb(file) {

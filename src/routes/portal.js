@@ -4,7 +4,7 @@
 // email on file + last 4 digits of the phone on file. Never shows internal notes, red flags or underwriting notes.
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
-const { html, raw, int, sha256, fmtDate, fmtDateTime } = require('../lib/util');
+const { html, raw, int, sha256, fmtDate, fmtDateTime, todayISO } = require('../lib/util');
 const { publicPage, csrfInput } = require('../views/layout');
 const { verifyCsrf, csrfToken } = require('../lib/security');
 const { LOAN_TYPES } = require('../db');
@@ -68,23 +68,31 @@ ${l.verify_mode === 'email_phone4' ? html`<label class="field"><span>Last 4 digi
 <form method="post" action="/p/${tok}/upload" enctype="multipart/form-data" class="up-row">${csrfInput(csrf)}<input type="hidden" name="condition_id" value="${i.id}">
 <input type="file" name="file" required accept="${up.ALLOWED.join(',')}" aria-label="File for ${i.label}"><button class="btn small">Upload</button></form></li>`;
     const loLine = [s.lo_name || '{{LO_NAME}}', s.lo_title].filter(Boolean).join(', ');
+    const idx = stages.PORTAL_STAGES.indexOf(d.stage); const stepNo = idx < 0 ? 0 : idx + 1; const nSteps = stages.PORTAL_STAGES.length;
+    const nextLabel = idx >= 0 && idx < nSteps - 1 ? stages.label(stages.PORTAL_STAGES[idx + 1]) : null;
+    const eta = d.next_step_date && d.next_step_date >= todayISO() ? d.next_step_date : null;
     res.status(msg && msg.status || 200).send(publicPage({ demoMode: cfg.demoMode, title: 'Loan status — ' + model.propertyShort(d), settings: s, body: html`
-<div class="portal">
+<div class="portal v3">
 <section class="card portal-head">
   <p class="eyebrow">Loan status · ${LOAN_TYPES[d.loan_type]}</p>
   <h1>${model.propertyShort(d)}</h1>
-  <p>Hi ${d.first_name || 'there'} — here is where your file stands today.${d.stage_changed_at ? html` <span class="muted small">Stage updated ${fmtDate(d.stage_changed_at)}.</span>` : ''}</p>
-  ${d.stage === 'Dead' ? html`<div class="flash warn">This file is not currently active.</div>` : timeline(d.stage)}
+  <p class="lede">Hi ${d.first_name || 'there'}, here is exactly where your file stands today.</p>
+  ${d.stage === 'Dead' ? html`<div class="flash warn">This file is not currently active.</div>` : html`
+  <div class="status-hero"><div class="status-now"><span class="status-label">Step ${stepNo} of ${nSteps}</span><strong>${info.label}</strong>${d.stage_changed_at ? html`<small>since ${fmtDate(d.stage_changed_at.slice(0, 10))}</small>` : ''}</div>
+  <progress value="${stepNo}" max="${nSteps}" aria-label="Step ${stepNo} of ${nSteps}"></progress>
+  <div class="status-pills"><span class="spill ${needed.length ? 'warn' : 'ok'}">${needed.length ? `${needed.length} item${needed.length > 1 ? 's' : ''} needed from you` : 'Nothing needed from you right now'}</span>${eta ? html`<span class="spill">Next step expected around ${fmtDate(eta)}</span>` : ''}</div></div>
+  ${timeline(d.stage)}`}
 </section>
 ${msg ? html`<div class="flash ${msg.type}">${msg.text}</div>` : ''}
-<section class="card now-card">
-  <h2>Current step: ${info.label}</h2>
-  <dl class="now-dl"><dt>What happens now</dt><dd>${info.now}</dd><dt>What we need from you</dt><dd>${info.need}</dd><dt>Typical next step</dt><dd>${info.next}</dd></dl>
-  <p class="muted small">Every file is different. Timing depends on the lender, third parties (appraisal, title, insurance) and how quickly items come in — we can't promise dates, and this page is not an approval or commitment to lend.</p>
-</section>
+<div class="three-up">
+<section class="card now-card"><p class="eyebrow">Where things stand</p><h2>What happens now</h2><p>${info.now}</p></section>
+<section class="card need-card ${needed.length ? 'has-needs' : ''}"><p class="eyebrow">Your part</p><h2>What we need from you <span class="count">${needed.length}</span></h2>${needed.length ? html`<p>${info.need}</p><p><a class="btn" href="#needs">Upload ${needed.length} item${needed.length > 1 ? 's' : ''} ↓</a></p>` : html`<p class="ok-text">Nothing outstanding right now. We'll post here if anything else is needed.</p>`}</section>
+<section class="card next-card-p"><p class="eyebrow">Coming up</p><h2>What happens next</h2><p>${info.next}</p>
+${eta ? html`<div class="eta-box-p"><span>Expected next step</span><strong>${fmtDate(eta)}</strong>${d.next_step_note ? html`<p>${d.next_step_note}</p>` : ''}<small>An estimate from your loan officer, not a promise. Timing depends on the lender and third parties.</small></div>` : nextLabel ? html`<p class="muted small">Next on the timeline: <strong>${nextLabel}</strong>. Your loan officer will post an expected date here when there is one.</p>` : ''}</section>
+</div>
 <div class="portal-grid">
 <div>
-<section class="card">
+<section class="card" id="needs">
   <h2>What we need from you <span class="count">${needed.length}</span></h2>
   ${!needed.length ? html`<p class="ok-text">Nothing outstanding right now. We'll post here if anything else is needed.</p>` : ''}
   ${docs.length ? html`<h3>Documents</h3><ul class="need-list">${docs.map(itemRow)}</ul>` : ''}
@@ -95,18 +103,20 @@ ${msg ? html`<div class="flash ${msg.type}">${msg.text}</div>` : ''}
   <p class="muted small">Accepted: ${up.ALLOWED.join(', ')} · up to ${cfg.maxUploadMb} MB each. Please black out SSNs and full account numbers unless your loan officer's secure company system asks for them.</p>
 </section>
 ${inReview.length || done.length ? html`<section class="card"><h2>Received</h2><ul class="recv-list">${[...inReview, ...done].map(i => html`<li><span>${i.label}</span><span class="badge ${i.status === 'cleared' || i.status === 'waived' ? 'ok' : ''}">${statusWord[i.status]}</span></li>`)}</ul></section>` : ''}
+<section class="card"><h2>Updates</h2>${updates.length ? html`<ul class="feed">${updates.map(u => html`<li><time>${fmtDateTime(u.created_at)}</time><p>${u.body}</p></li>`)}</ul>` : html`<p class="muted">No updates yet.</p>`}</section>
 </div>
 <div>
 <section class="card lo-card">
   <h2>Your loan officer</h2>
   <p class="lo-name">${loLine}</p>
   <p>${s.nmls_id ? 'NMLS #' + s.nmls_id : 'NMLS #{{NMLS_ID}}'}${s.company_name ? html`<br>${s.company_name}${s.company_nmls_id ? ' · NMLS #' + s.company_nmls_id : ''}` : html`<br>{{COMPANY_NAME}} · NMLS #{{COMPANY_NMLS_ID}}`}</p>
-  ${s.phone ? html`<p><a href="tel:${digits(s.phone)}">${s.phone}</a></p>` : ''}
+  ${s.phone ? html`<p><a class="btn small ghost" href="tel:${digits(s.phone)}">📞 ${s.phone}</a></p>` : ''}
   ${s.booking_link ? html`<p><a class="btn small" href="${s.booking_link}" rel="noopener" target="_blank">Book a call</a></p>` : ''}
   <p class="muted small">Questions about your file? Contact your loan officer directly. Wire instructions are never sent through this page.</p>
 </section>
-<section class="card"><h2>Updates</h2>${updates.length ? html`<ul class="feed">${updates.map(u => html`<li><time>${fmtDateTime(u.created_at)}</time><p>${u.body}</p></li>`)}</ul>` : html`<p class="muted">No updates yet.</p>`}</section>
+<section class="card safety-card"><h2>🔒 Wire safety</h2><p class="small">Before sending any money, call the title company at a phone number you already know to confirm wire instructions. Never trust wire instructions or changes sent by email or text.</p></section>
 </div></div>
+<p class="muted small">Every file is different. Timing depends on the lender, third parties (appraisal, title, insurance) and how quickly items come in — we can't promise dates, and this page is not an approval or commitment to lend.</p>
 <p class="disclaimer small">This page shows general file status for a business-purpose investment property loan request. It is not a loan approval, commitment to lend, rate lock or guarantee of terms or timing. All loans are subject to lender underwriting, credit review, property valuation and program guidelines. ${s.state_disclosures || ''}</p>
 </div>` }));
   }
